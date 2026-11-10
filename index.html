@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReadFluently 🦉 | Interactive Reading Speed Trainer for Children</title>
+    
+    <!-- Google Fonts for Child-Friendly & Dyslexia Accessibility -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Lexend:wght@400;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- PDF.js for Client-Side PDF Text Extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- i18n Translation Engine (Loaded first) -->
+    <script src="js/i18n.js"></script>
+</head>
+<body class="size-normal">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="brand-container">
+            <span class="app-logo">🦉</span>
+            <div>
+                <h1 class="brand-title" data-i18n="brandTitle">ReadFluently</h1>
+                <p class="brand-subtitle" data-i18n="brandSubtitle">Interactive Reading Speed Trainer for Kids</p>
+            </div>
+        </div>
+
+        <nav class="header-nav">
+            <button type="button" class="nav-tab active" data-tab="reading">
+                <span data-i18n="tabReading">📖 Reading Room</span>
+            </button>
+            <button type="button" class="nav-tab" data-tab="progress">
+                <span data-i18n="tabProgress">📊 My Progress</span>
+            </button>
+            <button type="button" class="nav-tab" data-tab="profiles">
+                <span data-i18n="tabProfiles">👤 Profiles & Files</span>
+            </button>
+        </nav>
+
+        <div class="header-right-group">
+            <!-- Language Switcher Button (English / French) -->
+            <button type="button" class="header-lang-btn" id="btn-lang-toggle" title="Switch Language / Changer de langue">
+                <span>🇬🇧 English</span> <span class="lang-switch-sub">(FR)</span>
+            </button>
+
+            <!-- Active Child Profile Button -->
+            <button type="button" class="header-profile-btn" id="btn-profile-header" title="Switch or Manage Profiles">
+                <span class="header-avatar-circle" id="header-avatar">🦁</span>
+                <div class="header-profile-text">
+                    <span class="header-name" id="header-name">Leo</span>
+                    <span class="header-grade" id="header-grade">Grade 2</span>
+                </div>
+            </button>
+        </div>
+    </header>
+
+    <!-- Child Accessibility & TTS Voice Toolbar -->
+    <aside class="accessibility-bar">
+        <div class="access-group">
+            <span style="font-weight: 800;" data-i18n="readingTools">⚙️ Reading Tools:</span>
+            
+            <!-- Font Size -->
+            <label class="access-item">
+                <span data-i18n="fontSizeLabel">Font Size:</span>
+                <select id="select-font-size" class="access-select">
+                    <option value="small" data-i18n="fontSizeSmall">Small</option>
+                    <option value="normal" selected data-i18n="fontSizeNormal">Normal</option>
+                    <option value="large" data-i18n="fontSizeLarge">Large (A+)</option>
+                    <option value="xlarge" data-i18n="fontSizeXLarge">Extra Large (A++)</option>
+                </select>
+            </label>
+
+            <!-- Dyslexia Font Toggle -->
+            <label class="access-item">
+                <input type="checkbox" id="toggle-dyslexia-font">
+                <span data-i18n="dyslexiaFontLabel">Dyslexia-Friendly Font</span>
+            </label>
+
+            <!-- Reading Ruler Guide -->
+            <label class="access-item">
+                <input type="checkbox" id="toggle-reading-ruler">
+                <span data-i18n="readingRulerLabel">Reading Ruler Guide 📏</span>
+            </label>
+        </div>
+
+        <!-- Voice & TTS Options -->
+        <div class="access-group access-group-voices">
+            <!-- Voice Gender Filter -->
+            <label class="access-item">
+                <span style="font-weight: 700;">👤 Gender / Genre:</span>
+                <select id="select-voice-gender" class="access-select">
+                    <option value="auto">All Voices / Toutes les voix</option>
+                    <option value="female">Female 👩 / Féminine</option>
+                    <option value="male">Male 👨 / Masculine</option>
+                </select>
+            </label>
+
+            <!-- TTS Voice Selector -->
+            <label class="access-item">
+                <span data-i18n="voiceSelectLabel">Voice:</span>
+                <select id="select-tts-voice" class="access-select" style="max-width: 220px;">
+                    <!-- Dynamically populated from available system voices -->
+                </select>
+            </label>
+
+            <!-- Test Voice Button -->
+            <button type="button" class="btn-sm btn-secondary" id="btn-test-voice" data-i18n="voiceTestBtn">
+                🔊 Test Voice
+            </button>
+
+            <!-- Sound FX Toggle -->
+            <label class="access-item">
+                <input type="checkbox" id="toggle-sound" checked>
+                <span data-i18n="soundEffectsLabel">Sound Effects 🔔</span>
+            </label>
+        </div>
+    </aside>
+
+    <!-- Main Content Application -->
+    <main class="app-main">
+
+        <!-- ============================================================= -->
+        <!-- TAB 1: READING ROOM                                           -->
+        <!-- ============================================================= -->
+        <section id="view-reading" class="tab-view active">
+            <div class="reading-room-grid">
+
+                <!-- Mode Selection -->
+                <div class="mode-selector-bar">
+                    <button type="button" class="input-mode-btn active" data-mode="library" data-i18n="modeLibrary">
+                        📚 Story Library
+                    </button>
+                    <button type="button" class="input-mode-btn" data-mode="paste" data-i18n="modePaste">
+                        📄 Paste Text
+                    </button>
+                    <button type="button" class="input-mode-btn" data-mode="upload" data-i18n="modeUpload">
+                        📑 Upload PDF / Document
+                    </button>
+                </div>
+
+                <!-- Mode 1: Built-in Stories Library -->
+                <div id="mode-library-panel" class="library-panel-wrapper">
+                    <div class="story-library-grid" id="story-library-grid">
+                        <!-- Populated by JS based on selected language -->
+                    </div>
+                </div>
+
+                <!-- Mode 2: Paste Text Panel -->
+                <div id="mode-paste-panel" class="paste-panel-wrapper hidden">
+                    <div class="paste-box">
+                        <input type="text" id="paste-title-input" class="text-input-field" placeholder="Story Title (e.g., My Favorite Dino Adventure)" data-i18n-placeholder="pasteTitlePlaceholder">
+                        <textarea id="paste-text-input" class="textarea-field" placeholder="Paste reading practice text or chapter here..." data-i18n-placeholder="pasteTextPlaceholder"></textarea>
+                        <button type="button" id="btn-load-pasted" class="btn-primary-large" style="align-self: flex-start;">
+                            <span data-i18n="btnLoadPasted">Load Into Reading Room ✨</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mode 3: PDF / TXT Upload Panel -->
+                <div id="mode-upload-panel" class="upload-panel-wrapper hidden">
+                    <div class="pdf-drop-zone" id="pdf-drop-zone" onclick="document.getElementById('pdf-file-input').click()">
+                        <span class="drop-icon">📄</span>
+                        <h3 class="drop-title" data-i18n="pdfDropTitle">Upload a PDF or Text Document</h3>
+                        <p class="drop-desc" data-i18n="pdfDropDesc">Drag and drop any children's book PDF or homework file, or click to browse</p>
+                        <input type="file" id="pdf-file-input" accept=".pdf,application/pdf,.txt,text/plain" style="display: none;">
+                        <button type="button" class="btn-secondary" data-i18n="btnChoosePdf">Choose PDF File</button>
+                        <div id="upload-status-msg" class="upload-status"></div>
+                    </div>
+                </div>
+
+                <!-- Reading Stage Card -->
+                <div class="reading-stage-card">
+                    <div class="reading-header-bar">
+                        <div class="reading-title-area">
+                            <h2 class="reading-doc-title" id="reading-doc-title" data-i18n="loadingStory">Loading Story...</h2>
+                            <span class="reading-meta-tag" id="reading-total-words">0 words</span>
+                            <span class="reading-meta-target" id="reading-target-wpm">75 WPM Goal</span>
+                        </div>
+                        <div class="reading-actions-bar">
+                            <button type="button" class="btn-outline btn-sm" id="btn-read-along" title="Listen to story read aloud">
+                                <span data-i18n="btnListenStory">🔊 Listen to Story</span>
+                            </button>
+                            <button type="button" class="btn-outline btn-sm" id="btn-reset-reading" title="Restart from beginning">
+                                <span data-i18n="btnReset">🔄 Reset</span>
+                            </button>
+                            <button type="button" class="btn-secondary btn-sm" id="btn-finish-early" title="Finish and take quiz">
+                                <span data-i18n="btnFinishQuiz">🏁 Finish & Quiz</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Word Display -->
+                    <div class="reading-words-container" id="reading-words-container" tabindex="0">
+                        <!-- Word tokens will be generated here -->
+                    </div>
+
+                    <!-- Progress fill bar -->
+                    <div class="reading-progress-track">
+                        <div class="reading-progress-fill" id="reading-progress-fill"></div>
+                    </div>
+
+                    <!-- Live Reading Speed (WPM / MPM) & Microphone Bar -->
+                    <div class="live-dashboard-bar">
+                        <!-- Mascot Helper -->
+                        <div class="mascot-strip">
+                            <span class="mascot-avatar">🦉</span>
+                            <div class="mascot-bubble" id="reading-mascot-msg" data-i18n="mascotDefault">
+                                Click the green microphone and read aloud. I'll highlight the words as you say them!
+                            </div>
+                        </div>
+
+                        <!-- Central Real-Time WPM Speedometer -->
+                        <div class="wpm-speedometer-box">
+                            <div class="wpm-digital-readout">
+                                <span class="wpm-number" id="live-wpm-value">0</span>
+                                <span class="wpm-label" data-i18n="wpmUnitLabel">Words / Min (WPM)</span>
+                            </div>
+                            <div class="wpm-metrics-column">
+                                <div id="live-speed-tier">
+                                    <span class="tier-pill tier-turtle">🐢 Steady Turtle</span>
+                                </div>
+                                <div class="sub-metric"><span data-i18n="wordsReadLabel">Words:</span> <strong id="live-words-read">0 / 0</strong></div>
+                                <div class="sub-metric"><span data-i18n="timerLabel">Time:</span> <strong id="live-read-timer">0:00</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Mic Controls -->
+                        <div class="live-controls-column">
+                            <div id="mic-status-pill" class="mic-pill">
+                                ⚪ <span data-i18n="micReady">Microphone ready</span>
+                            </div>
+                            <div class="mic-controls-row">
+                                <button type="button" id="btn-mic-toggle" class="btn-mic-main">
+                                    <span data-i18n="btnStartReading">🎙️ Start Reading Aloud</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- TAB 2: PROGRESS & BADGES DASHBOARD                            -->
+        <!-- ============================================================= -->
+        <section id="view-progress" class="tab-view">
+            <div class="progress-dashboard">
+
+                <!-- Profile Hero Bar -->
+                <div class="dash-profile-hero">
+                    <span class="dash-avatar" id="dash-profile-avatar">🦁</span>
+                    <div class="dash-details">
+                        <h2><span id="dash-profile-name">Leo</span><span data-i18n="readingProgressTitle">'s Reading Progress</span></h2>
+                        <p><span id="dash-profile-grade">Grade 2</span> • <span data-i18n="goalLabel">Reading Speed Goal:</span> <strong id="dash-target-wpm">75 WPM</strong></p>
+                    </div>
+                </div>
+
+                <!-- Metric Summary Cards -->
+                <div class="dash-metrics-cards-row">
+                    <div class="metric-card">
+                        <span class="metric-icon">⚡</span>
+                        <div class="metric-info">
+                            <span class="metric-val" id="stat-avg-wpm">0</span>
+                            <span class="metric-title" data-i18n="statAvgWpm">Average WPM</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-icon">🚀</span>
+                        <div class="metric-info">
+                            <span class="metric-val" id="stat-top-wpm">0</span>
+                            <span class="metric-title" data-i18n="statTopWpm">Highest WPM</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-icon">📚</span>
+                        <div class="metric-info">
+                            <span class="metric-val" id="stat-total-words">0</span>
+                            <span class="metric-title" data-i18n="statTotalWords">Total Words Read</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-icon">🧠</span>
+                        <div class="metric-info">
+                            <span class="metric-val" id="stat-avg-comp">0%</span>
+                            <span class="metric-title" data-i18n="statAvgComp">Comprehension Avg</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-icon">⏱️</span>
+                        <div class="metric-info">
+                            <span class="metric-val" id="stat-total-time">0m</span>
+                            <span class="metric-title" data-i18n="statTotalTime">Total Read Time</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Visual Canvas Charts -->
+                <div class="dash-charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title" data-i18n="chartWpmTitle">📈 Reading Speed (WPM) Over Time</h3>
+                            <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;" data-i18n="chartWpmTarget">Target Reference Included</span>
+                        </div>
+                        <canvas id="canvas-wpm-chart" class="chart-canvas"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title" data-i18n="chartCompTitle">🎯 Comprehension & Accuracy Metrics</h3>
+                            <div style="font-size: 11px; display: flex; gap: 8px;">
+                                <span style="color: #10b981; font-weight: 800;">■ Comprehension</span>
+                                <span style="color: #8b5cf6; font-weight: 800;">■ Accuracy</span>
+                            </div>
+                        </div>
+                        <canvas id="canvas-comp-chart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Badges & Trophies Showcase -->
+                <div class="badges-showcase-card">
+                    <h3 class="chart-title" data-i18n="badgesTitle">🏆 Reading Badges & Achievements</h3>
+                    <div class="badges-grid" id="dash-badges-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Session History Log Table -->
+                <div class="history-card">
+                    <h3 class="chart-title" data-i18n="historyTitle">📜 Reading Session History</h3>
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="tableDate">Date & Time</th>
+                                <th data-i18n="tableTitle">Story Title</th>
+                                <th data-i18n="tableWords">Words</th>
+                                <th data-i18n="tableTime">Time</th>
+                                <th data-i18n="tableSpeed">Speed (WPM)</th>
+                                <th data-i18n="tableComp">Comprehension</th>
+                                <th data-i18n="tableAcc">Accuracy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-history-tbody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- TAB 3: PROFILES & TEXT FILE MANAGEMENT (NO DATABASE)          -->
+        <!-- ============================================================= -->
+        <section id="view-profiles" class="tab-view">
+            <div class="profiles-column">
+
+                <!-- Notice banner explaining Text File storage -->
+                <div class="textfile-info-banner">
+                    <span class="info-icon">📁</span>
+                    <div class="info-text">
+                        <h4 data-i18n="textBannerTitle">100% Lightweight Text File Storage — No Database Overloads!</h4>
+                        <p data-i18n="textBannerDesc">User profiles, WPM progress, and comprehension logs are saved directly in standard text files (.txt). You can download them, print them out, or import them onto any computer!</p>
+                    </div>
+                </div>
+
+                <div class="profiles-view-grid">
+                    <!-- Left: Profiles List -->
+                    <div class="profiles-column">
+                        <h3 class="chart-title" data-i18n="existingProfilesTitle">👥 Existing Reader Profiles</h3>
+                        <div id="profiles-list-container" class="profiles-column">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Create Profile & Text File Operations -->
+                    <div class="profiles-column">
+                        <!-- Create Profile Card -->
+                        <div class="card-box">
+                            <h3 class="chart-title" style="margin-bottom: 14px;" data-i18n="createProfileTitle">✨ Create New Reader Profile</h3>
+                            <form id="form-create-profile">
+                                <div class="form-group">
+                                    <label for="new-profile-name" data-i18n="childNameLabel">Child's Name:</label>
+                                    <input type="text" id="new-profile-name" class="text-input-field" placeholder="e.g. Maya or Sam" data-i18n-placeholder="childNamePlaceholder" required>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="chooseAvatarLabel">Choose Reader Avatar:</label>
+                                    <div class="avatar-selector-row">
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🦁" checked>
+                                            <span>🦁</span>
+                                        </label>
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🦉">
+                                            <span>🦉</span>
+                                        </label>
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🦊">
+                                            <span>🦊</span>
+                                        </label>
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🐼">
+                                            <span>🐼</span>
+                                        </label>
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🚀">
+                                            <span>🚀</span>
+                                        </label>
+                                        <label class="avatar-radio-label">
+                                            <input type="radio" name="profile-avatar" value="🦄">
+                                            <span>🦄</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-profile-grade" data-i18n="gradeLabel">Grade / Age Level:</label>
+                                    <select id="new-profile-grade" class="access-select" style="padding: 10px;">
+                                        <option value="Grade 1 / CP">Grade 1 / CP (Ages 6-7)</option>
+                                        <option value="Grade 2 / CE1" selected>Grade 2 / CE1 (Ages 7-8)</option>
+                                        <option value="Grade 3 / CE2">Grade 3 / CE2 (Ages 8-9)</option>
+                                        <option value="Grade 4 / CM1">Grade 4 / CM1 (Ages 9-10)</option>
+                                        <option value="Grade 5 / CM2">Grade 5 / CM2 (Ages 10-11)</option>
+                                        <option value="Grade 6+ / 6ème">Grade 6+ / 6ème (Ages 11+)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-profile-wpm" data-i18n="targetWpmLabel">Target Speed Goal (WPM / MPM):</label>
+                                    <input type="number" id="new-profile-wpm" class="text-input-field" value="75" min="20" max="250">
+                                </div>
+                                <button type="submit" class="btn-primary-large" style="width: 100%; margin-top: 10px;">
+                                    <span data-i18n="btnCreateProfile">Create Reader Profile 🌟</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Text File Backup & Import Card -->
+                        <div class="card-box">
+                            <h3 class="chart-title" style="margin-bottom: 12px;" data-i18n="textBackupsTitle">💾 Text File Backups & Transfer</h3>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;" data-i18n="textBackupsDesc">
+                                Easily import and export your reading logs without any database setup.
+                            </p>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <button type="button" class="btn-secondary" onclick="window.storageManager.downloadProfileTextFile()">
+                                    <span data-i18n="btnDownloadActiveTxt">📥 Download Active Profile as .txt File</span>
+                                </button>
+                                <button type="button" class="btn-outline" onclick="window.storageManager.saveDirectlyToDisk()">
+                                    <span data-i18n="btnSaveDirectDisk">💾 Save Directly to Computer (1-Click)</span>
+                                </button>
+                                <button type="button" class="btn-outline" onclick="window.storageManager.downloadAllProfilesTextArchive()">
+                                    <span data-i18n="btnDownloadAllArchive">📦 Download All Profiles Archive (.txt)</span>
+                                </button>
+                                <label class="btn-secondary" style="text-align: center; cursor: pointer;">
+                                    <span data-i18n="btnImportTxt">📂 Import Profile from .txt or .json File</span>
+                                    <input type="file" id="profile-file-input" accept=".txt,.json" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ============================================================= -->
+    <!-- MODALS                                                        -->
+    <!-- ============================================================= -->
+
+    <!-- Comprehension Quiz Modal -->
+    <div id="modal-comprehension" class="modal-backdrop hidden">
+        <div class="modal-box modal-box-large">
+            <button type="button" class="modal-close-btn" onclick="document.getElementById('modal-comprehension').classList.add('hidden')">✕</button>
+            <div id="comprehension-quiz-content">
+                <!-- Dynamically populated by js/comprehension.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Session Celebration Modal -->
+    <div id="modal-session-summary" class="modal-backdrop hidden">
+        <div class="modal-box">
+            <button type="button" class="modal-close-btn" onclick="app.closeSummaryModal()">✕</button>
+            <div id="session-summary-content">
+                <!-- Dynamically populated by js/app.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Text File Preview Modal -->
+    <div id="modal-textfile-preview" class="modal-backdrop hidden">
+        <div class="modal-box modal-box-large">
+            <button type="button" class="modal-close-btn" onclick="app.closeTextFilePreviewModal()">✕</button>
+            <h3 class="chart-title"><span data-i18n="rawPreviewTitle">📄 Text File Preview:</span> <span id="textfile-preview-title">profile.txt</span></h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" data-i18n="rawPreviewDesc">
+                This plain text file is saved directly on your computer. Parents and teachers can open it in Notepad or print it anytime!
+            </p>
+            <pre id="raw-textfile-content" class="raw-textfile-pre"></pre>
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn-secondary" onclick="window.storageManager.downloadProfileTextFile()">
+                    <span data-i18n="btnDownloadActiveTxt">Download This .txt File</span>
+                </button>
+                <button type="button" class="btn-outline" onclick="app.closeTextFilePreviewModal()">
+                    <span data-i18n="closeBtn">Close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/stories.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/speech.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/comprehension.js"></script>
+    <script src="js/pdf-helper.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

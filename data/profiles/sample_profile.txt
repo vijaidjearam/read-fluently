@@ -1,0 +1,125 @@
+============================================================
+READ FLUENTLY - CHILD READING PROGRESS FILE
+============================================================
+Child Name    : Leo
+Avatar        : 🦁
+Avatar Name   : Brave Lion
+Grade / Level : Grade 2
+Target WPM    : 75
+Date Created  : 2026-11-01
+Last Active   : 2026-11-09 10:30
+
+------------------------------------------------------------
+SUMMARY METRICS
+------------------------------------------------------------
+Total Sessions Completed : 5
+Total Words Read         : 642 words
+Average Reading Speed    : 68 WPM
+Highest Speed Recorded   : 78 WPM
+Average Comprehension    : 93%
+Average Word Accuracy    : 94%
+Total Reading Time       : 9 minutes 45 seconds
+
+------------------------------------------------------------
+SESSION HISTORY LOG
+------------------------------------------------------------
+[2026-11-01 14:20] Story: The Magic Tree Fox | Words: 95 | Time: 1m 32s | Speed: 62 WPM | Accuracy: 92% | Comprehension: 100%
+[2026-11-03 16:10] Story: Space Adventure    | Words: 130 | Time: 1m 58s | Speed: 66 WPM | Accuracy: 94% | Comprehension: 100%
+[2026-11-05 15:45] Story: The Lost Puppy     | Words: 112 | Time: 1m 40s | Speed: 67 WPM | Accuracy: 93% | Comprehension: 67%
+[2026-11-07 10:15] Story: The Friendly Whale | Words: 145 | Time: 2m 02s | Speed: 71 WPM | Accuracy: 96% | Comprehension: 100%
+[2026-11-09 10:30] Story: The Secret Garden  | Words: 160 | Time: 2m 03s | Speed: 78 WPM | Accuracy: 97% | Comprehension: 100%
+
+------------------------------------------------------------
+EARNED BADGES & ACHIEVEMENTS
+------------------------------------------------------------
+[★] First Reader       : Completed your very first reading adventure!
+[★] Speed Explorer     : Reached 60+ Words Per Minute!
+[★] Fast Bunny         : Reached 75+ Words Per Minute!
+[★] Comprehension Ace  : Scored 100% on reading comprehension!
+[★] 500 Words Master   : Read over 500 words in total!
+
+============================================================
+APPLICATION DATA PAYLOAD (READ FLUENTLY RE-IMPORT DATA)
+============================================================
+DATA_PAYLOAD_START
+{
+  "id": "profile_leo_default",
+  "name": "Leo",
+  "avatar": "🦁",
+  "avatarName": "Brave Lion",
+  "grade": "Grade 2",
+  "targetWPM": 75,
+  "createdDate": "2026-11-01T14:00:00.000Z",
+  "lastActive": "2026-11-09T10:30:00.000Z",
+  "badges": [
+    "badge_first_read",
+    "badge_speed_60",
+    "badge_speed_75",
+    "badge_comprehension_100",
+    "badge_words_500"
+  ],
+  "sessions": [
+    {
+      "id": "sess_01",
+      "date": "2026-11-01T14:20:00.000Z",
+      "title": "The Magic Tree Fox",
+      "wordCount": 95,
+      "durationSeconds": 92,
+      "wpm": 62,
+      "accuracy": 92,
+      "comprehensionScore": 100,
+      "comprehensionQuestions": 3,
+      "comprehensionCorrect": 3
+    },
+    {
+      "id": "sess_02",
+      "date": "2026-11-03T16:10:00.000Z",
+      "title": "Space Adventure",
+      "wordCount": 130,
+      "durationSeconds": 118,
+      "wpm": 66,
+      "accuracy": 94,
+      "comprehensionScore": 100,
+      "comprehensionQuestions": 3,
+      "comprehensionCorrect": 3
+    },
+    {
+      "id": "sess_03",
+      "date": "2026-11-05T15:45:00.000Z",
+      "title": "The Lost Puppy",
+      "wordCount": 112,
+      "durationSeconds": 100,
+      "wpm": 67,
+      "accuracy": 93,
+      "comprehensionScore": 67,
+      "comprehensionQuestions": 3,
+      "comprehensionCorrect": 2
+    },
+    {
+      "id": "sess_04",
+      "date": "2026-11-07T10:15:00.000Z",
+      "title": "The Friendly Whale",
+      "wordCount": 145,
+      "durationSeconds": 122,
+      "wpm": 71,
+      "accuracy": 96,
+      "comprehensionScore": 100,
+      "comprehensionQuestions": 3,
+      "comprehensionCorrect": 3
+    },
+    {
+      "id": "sess_05",
+      "date": "2026-11-09T10:30:00.000Z",
+      "title": "The Secret Garden",
+      "wordCount": 160,
+      "durationSeconds": 123,
+      "wpm": 78,
+      "accuracy": 97,
+      "comprehensionScore": 100,
+      "comprehensionQuestions": 3,
+      "comprehensionCorrect": 3
+    }
+  ]
+}
+DATA_PAYLOAD_END
+============================================================
