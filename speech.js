@@ -1,8 +1,9 @@
 /**
  * Speech Recognition and Reading Speed (WPM) Engine for ReadFluently
  * 
- * Fine-tuned for zero-latency, word-by-word real-time matching
- * supporting English (en-US) and French (fr-FR).
+ * High-performance, low-latency Sequence Alignment Engine.
+ * Matches spoken words against the reading text in real-time with
+ * child-friendly phonetic tolerance and zero artificial delay.
  */
 
 class ReadingSpeechEngine {
@@ -18,11 +19,7 @@ class ReadingSpeechEngine {
         this.tokens = [];            // Array of word objects { original, clean, index }
         this.currentIndex = 0;       // Index of word currently expected to be read
         this.matchedCount = 0;       // Total words correctly matched
-        this.missedWords = [];       // Words skipped or missed
-
-        // Recognition stream offset tracking (prevents duplicate matching and multi-word jumping)
-        this.lastProcessedResultIndex = 0;
-        this.interimWordOffset = 0;
+        this.missedWords = [];       // Words skipped
 
         // Timing & WPM
         this.startTime = null;
@@ -36,6 +33,10 @@ class ReadingSpeechEngine {
         this.onProgress = null;      // (currentIndex, totalWords, currentWpm, percent)
         this.onStatusChange = null;  // (status, message)
         this.onFinished = null;      // (summaryData)
+
+        // Per-utterance-segment deduplication counters
+        this._processedWordCount = 0;
+        this._lastResultIndex = 0;
 
         this.initRecognition();
     }
@@ -55,14 +56,11 @@ class ReadingSpeechEngine {
             this.recognition.continuous = true;
             this.recognition.interimResults = true;
             this.recognition.lang = this.recognitionLang;
-            // maxAlternatives = 1 significantly reduces recognition latency in Chromium
             this.recognition.maxAlternatives = 1;
             this.isSupported = true;
 
             this.recognition.onstart = () => {
                 this.isListening = true;
-                this.lastProcessedResultIndex = 0;
-                this.interimWordOffset = 0;
                 const msg = window.i18n ? window.i18n.t('micListening') : 'Microphone is listening...';
                 if (this.onStatusChange) this.onStatusChange('listening', msg);
             };
@@ -89,7 +87,11 @@ class ReadingSpeechEngine {
                     try {
                         this.recognition.start();
                     } catch (e) {
-                        // Restart debounce
+                        setTimeout(() => {
+                            if (this.isListening && !this.isPaused) {
+                                try { this.recognition.start(); } catch (err) {}
+                            }
+                        }, 50);
                     }
                 } else if (!this.isListening) {
                     const msg = window.i18n ? window.i18n.t('micReady') : 'Microphone ready';
@@ -142,7 +144,7 @@ class ReadingSpeechEngine {
             cleaned = cleaned.replace(/^(l'|d'|c'|j'|m'|t'|s'|n'|qu'|l’|d’|c’|j’|m’|t’|s’|n’|qu’)/, '');
         }
 
-        // Normalize accents (e.g. é -> e, à -> a, ç -> c) for phonetic resilience
+        // Normalize accents (e.g. é -> e, à -> a, ç -> c)
         cleaned = cleaned.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         // Strip non-alphanumeric
@@ -162,8 +164,6 @@ class ReadingSpeechEngine {
 
         this.isListening = true;
         this.isPaused = false;
-        this.lastProcessedResultIndex = 0;
-        this.interimWordOffset = 0;
         this.startTime = Date.now();
         this.lastSpeechTimestamp = Date.now();
 
@@ -174,7 +174,7 @@ class ReadingSpeechEngine {
                 this.recognition.lang = this.recognitionLang;
                 this.recognition.start();
             } catch (e) {
-                // Already started
+                // Already running
             }
         } else {
             if (this.onStatusChange) {
@@ -230,8 +230,9 @@ class ReadingSpeechEngine {
         this.currentWpm = 0;
         this.missedWords = [];
         this.tokens = [];
-        this.lastProcessedResultIndex = 0;
-        this.interimWordOffset = 0;
+        // Per-segment dedup counters
+        this._processedWordCount = 0;
+        this._lastResultIndex = 0;
     }
 
     startWpmTimer() {
@@ -271,95 +272,101 @@ class ReadingSpeechEngine {
     }
 
     /**
-     * Handles incoming speech stream with strict sequential matching.
-     * Prevents multi-word jumping by processing only newly spoken tokens
-     * and strictly checking the immediate expected word first.
+     * Last-Word-First Matching Engine for Live Reading Aloud.
+     *
+     * Strategy: React to the LATEST word Chrome just recognised (last word
+     * of the current interim transcript).  This gives the minimum possible
+     * latency because we don't re-process the entire growing transcript —
+     * we only act on what is new.
+     *
+     * Deduplication: we track the last raw transcript string we already
+     * acted on so that repeated interim firings for the same word are
+     * ignored.
      */
     handleSpeechResult(event) {
         if (!this.isListening || this.isPaused) return;
-
         this.lastSpeechTimestamp = Date.now();
 
+        // ── 1. Build the current interim transcript from this result event ──
+        let currentTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
-            const result = event.results[i];
-            const transcript = result[0].transcript || '';
-            const rawWords = transcript.trim().split(/\s+/).filter(Boolean);
+            const res = event.results[i];
+            if (res && res[0] && res[0].transcript) {
+                currentTranscript += ' ' + res[0].transcript;
+            }
+        }
+        currentTranscript = currentTranscript.trim();
+        if (!currentTranscript) return;
 
-            if (i > this.lastProcessedResultIndex) {
-                this.lastProcessedResultIndex = i;
-                this.interimWordOffset = 0;
+        // ── 2. Only process words we haven't matched yet ──
+        // Split the full transcript into raw words, then skip over words we
+        // already consumed in earlier events (tracked by this._processedWordCount).
+        const allRaw = currentTranscript.split(/\s+/).filter(Boolean);
+        if (allRaw.length === 0) return;
+
+        // On a new utterance segment (resultIndex moves forward) Chrome resets
+        // its transcript.  We reset our per-segment counter as well.
+        const isNewSegment = event.resultIndex > (this._lastResultIndex || 0);
+        if (isNewSegment) {
+            this._lastResultIndex = event.resultIndex;
+            this._processedWordCount = 0;
+        }
+
+        // Words spoken in THIS event that we haven't acted on yet
+        const newRaw = allRaw.slice(this._processedWordCount || 0);
+        if (newRaw.length === 0) return;
+
+        // ── 3. Process each genuinely new word left-to-right ──
+        let advanced = false;
+        for (let w = 0; w < newRaw.length; w++) {
+            if (this.currentIndex >= this.tokens.length) {
+                this.finishReading();
+                return;
             }
 
-            // Only process new spoken words since last matched position
-            const newWords = rawWords.slice(this.interimWordOffset);
-            if (newWords.length === 0) continue;
-
-            for (const rawWord of newWords) {
-                if (this.currentIndex >= this.tokens.length) {
-                    this.finishReading();
-                    return;
-                }
-
-                const spoken = this.normalizeWord(rawWord);
-                if (!spoken) {
-                    this.interimWordOffset++;
-                    continue;
-                }
-
-                // Priority 1: Match the immediate expected word (Index 0 lookahead)
-                const currentTarget = this.tokens[this.currentIndex].clean;
-                if (this.isWordMatch(spoken, currentTarget)) {
-                    this.matchWordAtIndex(this.currentIndex);
-                    this.interimWordOffset++;
-                    continue;
-                }
-
-                // Priority 2: Check next word (+1 lookahead if child skipped 1 word)
-                if (this.currentIndex + 1 < this.tokens.length) {
-                    const nextTarget = this.tokens[this.currentIndex + 1].clean;
-                    if (this.isWordMatch(spoken, nextTarget)) {
-                        this.tokens[this.currentIndex].matched = false;
-                        this.missedWords.push(this.tokens[this.currentIndex]);
-                        this.matchWordAtIndex(this.currentIndex + 1);
-                        this.interimWordOffset++;
-                        continue;
-                    }
-                }
-
-                // Priority 3: Check +2 lookahead ONLY if target word is distinctive (>= 4 letters)
-                if (this.currentIndex + 2 < this.tokens.length) {
-                    const skipTwoTarget = this.tokens[this.currentIndex + 2].clean;
-                    if (skipTwoTarget.length >= 4 && this.isWordMatch(spoken, skipTwoTarget)) {
-                        this.tokens[this.currentIndex].matched = false;
-                        this.tokens[this.currentIndex + 1].matched = false;
-                        this.missedWords.push(this.tokens[this.currentIndex], this.tokens[this.currentIndex + 1]);
-                        this.matchWordAtIndex(this.currentIndex + 2);
-                        this.interimWordOffset++;
-                        continue;
-                    }
-                }
-
-                // Priority 4: Stutter/repeat handling (child repeated previous word)
-                if (this.currentIndex > 0) {
-                    const prevTarget = this.tokens[this.currentIndex - 1].clean;
-                    if (this.isWordMatch(spoken, prevTarget)) {
-                        this.interimWordOffset++;
-                        continue;
-                    }
-                }
-
-                // Word did not match expected target: advance interim offset without jumping text
-                this.interimWordOffset++;
+            const spokenNorm = this.normalizeWord(newRaw[w]);
+            if (!spokenNorm) {
+                // Count empty-after-normalize words as consumed so they don't block
+                this._processedWordCount++;
+                continue;
             }
 
-            if (result.isFinal) {
-                this.interimWordOffset = 0;
-                this.lastProcessedResultIndex = i + 1;
+            const target0 = this.tokens[this.currentIndex].clean;
+
+            if (this.isWordMatch(spokenNorm, target0)) {
+                // ✅ Exact sequential match — the ideal case
+                this._advanceOne(this.currentIndex);
+                this._processedWordCount++;
+                advanced = true;
+
+            } else if (this.currentIndex + 1 < this.tokens.length) {
+                // Check one-word lookahead (skip a short function word)
+                const target1 = this.tokens[this.currentIndex + 1].clean;
+                if (this.isWordMatch(spokenNorm, target1)) {
+                    // Mark the skipped word as missed, advance two steps
+                    this.missedWords.push(this.tokens[this.currentIndex]);
+                    this.currentIndex++; // skip over missed word
+                    this._advanceOne(this.currentIndex);
+                    this._processedWordCount++;
+                    advanced = true;
+                } else {
+                    // No match — count this spoken word as consumed but don't advance
+                    // the reading cursor, so we stay on the same expected word.
+                    this._processedWordCount++;
+                }
+            } else {
+                // Near end of text, no lookahead possible
+                this._processedWordCount++;
             }
+        }
+
+        if (advanced) {
+            this.updateWpm();
         }
     }
 
-    matchWordAtIndex(index) {
+    /** Advance currentIndex past `index`, fire callback, check for end. */
+    _advanceOne(index) {
         this.tokens[index].matched = true;
         this.matchedCount++;
         this.currentIndex = index + 1;
@@ -368,26 +375,42 @@ class ReadingSpeechEngine {
             this.onWordMatched(index, this.tokens[index], this.currentWpm);
         }
 
-        this.updateWpm();
-
         if (this.currentIndex >= this.tokens.length) {
             this.finishReading();
         }
     }
 
+    /**
+     * Resilient child-friendly word matcher with phonetic & pronunciation tolerance.
+     */
     isWordMatch(spoken, target) {
         if (!spoken || !target) return false;
         if (spoken === target) return true;
 
-        // Prefix match for longer words
-        if (spoken.length >= 4 && target.length >= 4) {
-            if (target.startsWith(spoken) || spoken.startsWith(target)) return true;
+        const s = spoken.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const t = target.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        if (!s || !t) return false;
+        if (s === t) return true;
+
+        // French article elision tolerance: "lune" vs "lalune", "arbre" vs "larbre"
+        if (s === 'l' + t || s === 'd' + t || t === 'l' + s || t === 'd' + s) return true;
+
+        // Prefix match (e.g. "regarde" for "regarder", "jump" for "jumped", "pipe" for "pip")
+        if (s.length >= 3 && t.length >= 3) {
+            if (s.startsWith(t) || t.startsWith(s)) return true;
         }
 
-        const dist = this.levenshtein(spoken, target);
-        if (target.length <= 3) return dist === 0;
-        if (target.length <= 6) return dist <= 1;
-        return dist <= 2;
+        // Levenshtein phonetic distance
+        const dist = this.levenshtein(s, t);
+        if (t.length <= 3) {
+            // Short words (2-3 chars: "pip", "fox", "the", "le", "un"): allow distance <= 1!
+            return dist <= 1;
+        } else if (t.length <= 6) {
+            return dist <= (t.length >= 5 ? 2 : 1);
+        } else {
+            return dist <= 2;
+        }
     }
 
     levenshtein(a, b) {

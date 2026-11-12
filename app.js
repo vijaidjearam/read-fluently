@@ -502,42 +502,22 @@ class ReadFluentlyApp {
     }
 
     /**
-     * Smoothly highlights words during child's live reading.
-     * Prevents multi-word jumping by stepping through newly matched words sequentially.
+     * Instantly highlights the word the child just read.
+     * No cascade timers — every match fires immediately so there is zero
+     * artificial delay between speech recognition and visual feedback.
      */
     highlightWordSmooth(matchedIndex) {
         if (!this.wordElements || this.wordElements.length === 0) return;
         if (matchedIndex < 0 || matchedIndex >= this.wordElements.length) return;
 
-        // Clear any pending cascade animations
+        // Clear any stale cascade timeouts from a previous session
         if (this.highlightCascadeTimeouts && this.highlightCascadeTimeouts.length > 0) {
             this.highlightCascadeTimeouts.forEach(t => clearTimeout(t));
             this.highlightCascadeTimeouts = [];
         }
 
-        const prev = this.lastHighlightedWordIndex;
-
-        // Immediate next word: zero latency, instant transition!
-        if (matchedIndex === prev + 1 || prev < 0) {
-            this.applySingleWordHighlight(matchedIndex);
-            return;
-        }
-
-        // If multiple words were matched in one speech packet:
-        // Rapidly cascade through each word (45ms per word) so the child sees every word light up
-        if (matchedIndex > prev + 1) {
-            const start = prev + 1;
-            const steps = matchedIndex - start + 1;
-            for (let step = 0; step < steps; step++) {
-                const targetIdx = start + step;
-                const timeoutId = setTimeout(() => {
-                    this.applySingleWordHighlight(targetIdx);
-                }, step * 45);
-                this.highlightCascadeTimeouts.push(timeoutId);
-            }
-        } else {
-            this.applySingleWordHighlight(matchedIndex);
-        }
+        // Apply immediately — no setTimeout, no cascade
+        this.applySingleWordHighlight(matchedIndex);
     }
 
     applySingleWordHighlight(index) {
